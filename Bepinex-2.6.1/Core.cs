@@ -1,47 +1,79 @@
-﻿using HarmonyLib;
-using Il2Cpp;
-using MelonLoader_2._6._1;
-using MelonLoader;
-using MelonLoader.Utils;
+﻿using BepInEx;
+using BepInEx.Configuration;
+using BepInEx.Logging;
+using BepInEx.Unity.IL2CPP;
+using HarmonyLib;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(BetterShow), Info.NAME, Info.VER, Info.AUTHOR, null)]
-[assembly: MelonGame("LanPiaoPiao", "PlantsVsZombiesRH")]
-[assembly: MelonPlatformDomain(MelonPlatformDomainAttribute.CompatibleDomains.IL2CPP)]
-
-namespace MelonLoader_2._6._1
+namespace Bepinex_2._6._1
 {
-    public class Info
+    public class Debug
     {
-        public const String GUID = "saltyyh.pvzrh.bettershow"; //GUID
-        public const String NAME = "BetterShow";   //NAME
-        public const String VER = "1.1.0";   //VER
-        public const String AUTHOR = "Salmon,tingyuyehe";   //AUTHOR
-    }
+        public static ManualLogSource logger;
 
-    public class BetterShow : MelonMod
-    {
-        public static Board board = new Board();
-        public static String configDir = Path.Combine(MelonEnvironment.UserDataDirectory, "BetterShow");
-        public static MelonPreferences_Category config;
-        public static MelonPreferences_Entry<String> language;
-        public static MelonPreferences_Entry<bool> isShow;
-        public override void OnInitializeMelon()
+        public static void Log(object str)
         {
-            config = MelonPreferences.CreateCategory("BetterShow");
-            language = config.CreateEntry("Language", "zh-cn", "语言 / language", "使用何种语言显示属性 / Which language to use for display property");
-            isShow = config.CreateEntry("Show", true, "显示 / Show", "是否显示属性 / Whether to display property");
-
-            Console.OutputEncoding = System.Text.Encoding.UTF8;
-            LoggerInstance.Msg(Info.Name + " 加载成功！");
+            logger.LogInfo(str);
+        }
+        public static void LogError(object str)
+        {
+            logger.LogError(str);
         }
 
-        public override void OnUpdate()
+        public static void LogWarning(object str)
         {
-            base.OnUpdate();
+            logger.LogWarning(str);
+        }
+    }
+
+    public class Info
+    {
+        public const String GUID = "saltyyh.pvzrh.bettershow";
+        public const String NAME = "BetterShow";
+        public const String VER = "1.1.0";
+        public const String AUTHOR = "Salmon,tingyuyehe";
+    }
+
+    [BepInPlugin(Info.GUID, Info.NAME, Info.VER)]
+    public class BetterShow : BasePlugin
+    {
+        public static Harmony harmony = new Harmony(Info.GUID);
+
+        public static BetterShow Instance;
+
+        public static Board board = new Board();
+
+        public override void Load()
+        {
+            Debug.logger = base.Log;
+            harmony.PatchAll();
+            BetterShow.Instance = this;
+            main.CreateInstance(this);
+        }
+    }
+
+    public class main : MonoBehaviour
+    {
+        public BetterShow loader;
+        public static Board board = new Board();
+        public static String configDir = Path.Combine(Directory.GetCurrentDirectory(), "BepInEx", "config", Info.GUID + ".cfg");
+        public static ConfigFile config = new ConfigFile(configDir, true);
+        public static ConfigEntry<String> language = config.Bind("Language", "语言 / language", "zh-cn", "使用何种语言显示属性 / Which language to use for display property");
+        public static ConfigEntry<bool> isShow = config.Bind("Show", "显示 / Show", true, "是否显示属性 / Whether to display property");
+
+#pragma warning disable
+        void Start()
+        {
+            Console.OutputEncoding = System.Text.Encoding.UTF8;
+            Debug.Log(Info.NAME + " 加载成功！");
+        }
+
+        void Update()
+        {
             try
             {
                 board = GameAPP.board.GetComponent<Board>();
+
                 if (Input.GetKey(KeyCode.LeftShift))
                 {
                     if (Input.GetKeyDown(KeyCode.C))
@@ -51,8 +83,17 @@ namespace MelonLoader_2._6._1
                 }
                 if (Input.GetKeyDown(KeyCode.P))
                     isShow.Value = !isShow.Value;
+
             }
-            catch (Exception) { }
+            catch (Exception e) { }
+        }
+
+        public static void CreateInstance(BetterShow loader)
+        {
+            main main = loader.AddComponent<main>();
+            main.loader = loader;
+            UnityEngine.Object.DontDestroyOnLoad(main.gameObject);
+            main.hideFlags |= HideFlags.HideAndDontSave;
         }
 
         public static int GetCharInStringCount(String str, char target)
@@ -69,35 +110,23 @@ namespace MelonLoader_2._6._1
         }
     }
 
-    [HarmonyPatch(typeof(Plant), "Update")]
-    public class Plant_UpdatePatch
+    [HarmonyPatch(typeof(Plant))]
+    public class Plant_HealthTextPatch
     {
+        [HarmonyPatch("Update")]
         [HarmonyPostfix]
-        public static void Postfix(Plant __instance)
+        public static void Postfix_Update(Plant __instance)
         {
-            //__instance.healthSlider.Update();
-            //__instance.UpdateText();
+            if (__instance == null)
+            {
+                return;
+            }
             //__instance.UpdateHealthText();
-            if (!BetterShow.isShow.Value)
+            if (!main.isShow.Value)
             {
                 __instance.healthSlider.healthText.fontSize = 2.5f;
                 __instance.healthSlider.healthTextShadow.fontSize = 2.5f;
             }
-        }
-    }
-
-    [HarmonyPatch(typeof(Plant))]
-    public class Plant_HealthTextPatch
-    {
-        [HarmonyPatch(nameof(Plant.Update))]
-        [HarmonyPostfix]
-        public static void Postfix_Update(Plant __instance)
-        {
-            if (!__instance)
-                return;
-            //__instance.healthSlider.Update();
-            //__instance.UpdateText();
-            // Debug.Log(__instance.attributeCount)
 #if false
         }
 
@@ -106,9 +135,9 @@ namespace MelonLoader_2._6._1
         public static void Postfix(Plant __instance)
         {
 #endif
-            if (BetterShow.isShow.Value)
+            if (main.isShow.Value)
             {
-                String language = BetterShow.language.Value.ToLower();
+                String language = main.language.Value.ToLower();
 
                 String produceText = "生产冷却:";
                 String armingTimeText = "出土:";
@@ -358,7 +387,7 @@ namespace MelonLoader_2._6._1
                     }
                     __instance.healthSlider.healthText.text = DisplayedString;
                     __instance.healthSlider.healthTextShadow.text = DisplayedString;
-                    switch (BetterShow.GetCharInStringCount(DisplayedString, '\n'))
+                    switch (main.GetCharInStringCount(DisplayedString, '\n'))
                     {
                         case 1:
                             __instance.healthSlider.healthText.fontSize = 2.15f;
@@ -383,32 +412,29 @@ namespace MelonLoader_2._6._1
         }
     }
 
-    [HarmonyPatch(typeof(Zombie), nameof(Zombie.Update))]
-    public class Zombie_UpdatePatch
+    [HarmonyPatch(typeof(Zombie))]
+    public class Zombie_HealthTextPatch
     {
+        [HarmonyPatch("Update")]
         [HarmonyPostfix]
-        public static void Postfix(Zombie __instance)
+        public static void Postfix_Update(Zombie __instance)
         {
             __instance.UpdateHealthText();
-            if (!BetterShow.isShow.Value)
+            if (!main.isShow.Value)
             {
                 __instance.healthText.fontSize = 2.5f;
                 __instance.healthTextShadow.fontSize = 2.5f;
             }
         }
-    }
 
-    [HarmonyPatch(typeof(Zombie), nameof(Zombie.UpdateHealthText))]
-    public class Zombie_HealthTextPatch
-    {
         [HarmonyPatch("UpdateHealthText")]
         [HarmonyPostfix]
         public static void Postfix(Zombie __instance)
         {
-            if (BetterShow.isShow.Value)
+            if (main.isShow.Value)
             {
                 int count = 0;
-                foreach (Plant p in BetterShow.board.plantArray)
+                foreach (Plant p in main.board.plantArray)
                 {
                     if (p != null)
                     {
@@ -425,7 +451,7 @@ namespace MelonLoader_2._6._1
                     }
                 }
 
-                String language = BetterShow.language.Value.ToLower();
+                String language = main.language.Value.ToLower();
 
                 String poisonLevelText = "狙击秒杀:";
                 String snipeExecute = "蒜值:";
@@ -492,7 +518,7 @@ namespace MelonLoader_2._6._1
                     }
                 }
 
-                switch (BetterShow.GetCharInStringCount(__instance.healthText.text, '\n'))
+                switch (main.GetCharInStringCount(__instance.healthText.text, '\n'))
                 {
                     case 1:
                         __instance.healthText.fontSize = 2.15f;
