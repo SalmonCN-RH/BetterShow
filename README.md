@@ -6,3 +6,8 @@
 **按键帮助**：
 
 P键：是否显示植物属性
+LeftShift + C/E: 切换中英文
+
+**Release**
+
+在项目的releases文件夹有构建好的dll

@@ -6,3 +6,8 @@ Plant/zombie attributes will be displayed along with health
 **Key help**:
 
 P key: Whether to display plant properties
+LeftShift + C/E: Whether to display Chinese or English
+
+**Release**
+
+There are pre built DLLs in the releases folder of the project
